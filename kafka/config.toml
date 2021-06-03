@@ -1,0 +1,29 @@
+[hops]
+url = '127.0.0.1'
+# set to False or path to server certificate file
+# when using Hopsworks with a self signed certificate
+# otherwise leave this True
+verify = false
+
+[project]
+name =  'MyProject'
+# use hdfs.project_id() on Hopsworks to get your project ID
+id = '120'
+ca_file = 'trustStore.pem'
+certificate_file = 'keyStore.pem'
+key_file = 'keyStore.pem'
+key_password = 'password'
+
+[kafka]
+topic = 'topic_name'
+schema = 'schema_name'
+port = '9092'
+
+[kafka.consumer]
+group_id = 'MyGroup'
+auto_offset_reset =  'earliest'
+
+[api]
+base = '/hopsworks-api/api'
+key = 'paste your api key here'
+key_file = 'api_key_file'
