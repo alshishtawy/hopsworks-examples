@@ -67,7 +67,7 @@ def dict_to_sensor(obj, ctx):
 
 
 def main():
-    conf = toml.load('config_az.toml')
+    conf = toml.load('config.toml')
 
     schema_str = """
     {
