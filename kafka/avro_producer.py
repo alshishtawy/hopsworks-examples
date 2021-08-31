@@ -28,10 +28,12 @@ from confluent_kafka.schema_registry.avro import AvroSerializer
 from confluent_kafka.schema_registry import record_subject_name_strategy
 from datetime import datetime
 import toml
+from sensor import sensor
+from time import sleep
 
-class Sensor(object):
+class Event(object):
     """
-    Sensor record
+    An object representing a sensor event
 
     Args:
         id (str): Sensor's id
@@ -47,23 +49,23 @@ class Sensor(object):
         self.value = value
 
 
-def sensor_to_dict(sensor, ctx):
+def event_to_dict(event, ctx):
     """
-    Returns a dict representation of a Sensor instance for serialization.
+    Returns a dict representation of a sensor Event instance for serialization.
 
     Args:
-        sensor (Sensor): Sensor instance.
+        event (Event): Event instance.
 
         ctx (SerializationContext): Metadata pertaining to the serialization
             operation.
 
     Returns:
-        dict: Dict populated with sensor attributes to be serialized.
+        dict: Dict populated with sensor event attributes to be serialized.
 
     """
-    return dict(id=sensor.id,
-                timestamp=datetime.timestamp(sensor.timestamp),
-                value=sensor.value)
+    return dict(id=event.id,
+                timestamp=datetime.timestamp(event.timestamp),
+                value=event.value)
 
 
 def delivery_report(err, msg):
@@ -85,9 +87,9 @@ def delivery_report(err, msg):
 
     """
     if err is not None:
-        print("Delivery failed for User record {}: {}".format(msg.key(), err))
+        print("Delivery failed for sensor Event {}: {}".format(msg.key(), err))
         return
-    print('Sensor record {} successfully produced to {} [{}] at offset {}'.format(
+    print('Sensor Event {} successfully produced to {} [{}] at offset {}'.format(
         msg.key(), msg.topic(), msg.partition(), msg.offset()))
 
 
@@ -117,20 +119,21 @@ def main():
     }
     """
 
+    # url for the schema registry in HopsWorks REST API services
     registry_url = 'https://' + conf['hops']['url']\
         + conf['api']['base'] + '/project/'+conf['project']['id']+'/kafka'
 
     schema_registry_conf = {'url': registry_url, 'ssl.ca.location': conf['hops']['verify']}
     schema_registry_client = SchemaRegistryClient(schema_registry_conf)
 
-    # forcefully add the API key required by hops and not configurable through the confluent schema registry client
+    # add the API key required by HopsWorks but not configurable through the confluent schema registry client
     headers={'Authorization': 'ApiKey ' + conf['api']['key']}
     schema_registry_client._rest_client.session.headers.update(headers)
 
 
     avro_serializer = AvroSerializer(schema_registry_client,
                                      schema_str,
-                                     sensor_to_dict,
+                                     event_to_dict,
                                      {'auto.register.schemas': False, 'subject.name.strategy': record_subject_name_strategy})
 
 
@@ -145,23 +148,49 @@ def main():
 
     producer = SerializingProducer(producer_conf)
 
-    print("Producing user records to topic {}. ^C to exit.".format(conf['kafka']['topic']))
-    for x in range(0,10):
-        # Serve on_delivery callbacks from previous calls to produce()
-        producer.poll(0.0)
-        try:
-            sensor = Sensor(id='s10',
-                            timestamp=datetime.now(),
-                            value=x/20.0)
-            producer.produce(topic=conf['kafka']['topic'], key=str(uuid4()), value=sensor,
-                             on_delivery=delivery_report)
-        except KeyboardInterrupt:
-            break
-        except ValueError:
-            print("Invalid input, discarding record...")
-            continue
 
-    print("\nFlushing records...")
+    # initialize a number of sensors
+    #start/end time step for the sensor data generator
+    start = 0
+    number_of_events = 1000
+    end = start + number_of_events
+    sensors = [
+        sensor(baseline=10, slope=0.1,  period = 100, amplitude= 40, noise_level=5, start=start, end=end),
+        sensor(baseline=10, slope=0.2,  period =  80, amplitude= 30, noise_level=4, start=start, end=end),
+        sensor(baseline=20, slope=-0.1, period = 100, amplitude= 50, noise_level=6, phase=20, start=start, end=end),
+        sensor(baseline=10, slope=0.1,  period = 100, amplitude= 40, noise_level=0, start=start, end=end),
+        ]
+
+    print("Producing sensor events to topic {}. ^C to exit.".format(conf['kafka']['topic']))
+    print('Press Ctrl-c to stop')
+
+    # a counter for the number of time steps generated
+    time_step = start
+
+    try:
+        for data in zip(*sensors):
+            timestamp=datetime.now()
+            time_step += 1
+            for i, d in enumerate(data):
+                # Serve on_delivery callbacks from previous calls to produce()
+                producer.poll(0.0)
+                try:
+                    event = Event(id='sensor'+str(i),
+                                  timestamp=timestamp,
+                                  value=d)
+                    producer.produce(topic=conf['kafka']['topic'], key=event.id, value=event,
+                                     on_delivery=delivery_report)
+                except KeyboardInterrupt:
+                    break
+                except ValueError:
+                    print("Invalid input, discarding record...")
+                    continue
+            sleep(0.5)
+    except KeyboardInterrupt:
+        print('\nStopping...')
+        print('To continue execution start from event {}'.format(time_step))
+
+    print("Flushing records...")
     producer.flush()
 
 
