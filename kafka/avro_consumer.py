@@ -27,11 +27,11 @@ from confluent_kafka.serialization import StringDeserializer
 from confluent_kafka.schema_registry import record_subject_name_strategy
 from datetime import datetime
 import toml
+import argparse
 
-
-class Sensor(object):
+class Event(object):
     """
-    Sensor record
+    An object representing a sensor event
 
     Args:
         id (str): Sensor's id
@@ -47,7 +47,7 @@ class Sensor(object):
         self.value = value
 
 
-def dict_to_sensor(obj, ctx):
+def dict_to_event(obj, ctx):
     """
     Converts object literal(dict) to a User instance.
 
@@ -61,13 +61,19 @@ def dict_to_sensor(obj, ctx):
     if obj is None:
         return None
 
-    return Sensor(id=obj['id'],
+    return Event(id=obj['id'],
                 timestamp=datetime.fromtimestamp(obj['timestamp']),
                 value=obj['value'])
 
 
 def main():
-    conf = toml.load('config.toml')
+    # Parse arguments
+    parser = argparse.ArgumentParser(description='Consumes events from kafka topic hosted at a HopsWorks cluster.')
+    parser.add_argument("-c", "--config", default='config.toml',
+                        help='Configuration file in toml format.')
+    args = parser.parse_args()
+
+    conf = toml.load(args.config)
 
     schema_str = """
     {
@@ -96,14 +102,15 @@ def main():
     schema_registry_conf = {'url': registry_url, 'ssl.ca.location': conf['hops']['verify']}
     schema_registry_client = SchemaRegistryClient(schema_registry_conf)
 
-    # forcefully add the API key required by hops and not configurable through the confluent schema registry client
+    # Add the API key required by HopsWorks but not configurable through the confluent schema registry client
+
     headers={'Authorization': 'ApiKey ' + conf['api']['key']}
 
     schema_registry_client._rest_client.session.headers.update(headers)
 
     avro_deserializer = AvroDeserializer(schema_registry_client,
                                          schema_str,
-                                         dict_to_sensor)
+                                         dict_to_event)
 
     string_deserializer = StringDeserializer('utf_8')
 
@@ -130,14 +137,14 @@ def main():
             if msg is None:
                 continue
 
-            sensor = msg.value()
-            if sensor is not None:
-                print("Sensor record {}: id: {}\n"
+            event = msg.value()
+            if event is not None:
+                print("Event record {}: id: {}\n"
                       "\ttimestamp: {}\n"
                       "\tvalue: {}\n"
-                      .format(msg.key(), sensor.id,
-                              sensor.timestamp,
-                              sensor.value))
+                      .format(msg.key(), event.id,
+                              event.timestamp,
+                              event.value))
         except KeyboardInterrupt:
             break
 

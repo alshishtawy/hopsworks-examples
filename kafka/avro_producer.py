@@ -165,7 +165,6 @@ def main():
                      'value.serializer': avro_serializer}
     producer = SerializingProducer(producer_conf)
 
-
     # Initialize a number of sensors
     start = args.time
     end = start + args.events if args.events > 0 else -1
@@ -203,7 +202,6 @@ def main():
             sleep(args.delay)
     except KeyboardInterrupt:
         print('\nStopping...')
-
 
     print("Flushing records...")
     producer.flush()
