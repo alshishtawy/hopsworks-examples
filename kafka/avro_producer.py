@@ -19,7 +19,6 @@
 #
 # This is a simple example of the SerializingProducer using Avro.
 #
-from uuid import uuid4
 
 from confluent_kafka import SerializingProducer
 from confluent_kafka.serialization import StringSerializer
@@ -28,6 +27,7 @@ from confluent_kafka.schema_registry.avro import AvroSerializer
 from confluent_kafka.schema_registry import record_subject_name_strategy
 from datetime import datetime
 import toml
+import argparse
 from sensor import sensor
 from time import sleep
 
@@ -95,8 +95,25 @@ def delivery_report(err, msg):
 
 def main():
 
-    conf = toml.load('config.toml')
+    # Parse arguments
+    parser = argparse.ArgumentParser(description='Produces time series data from emulated '
+                                     'sensors into a kafka topic hosted at a HopsWorks cluster.')
+    parser.add_argument("-c", "--config", default='config.toml',
+                        help='Configuration file in toml format.')
+    parser.add_argument("-t", "--time", default=0, type=int,
+                        help='Start time step for the time series generator. Used to resume '
+                        'generating the same series after stopping the program.')
+    parser.add_argument("-e", "--events", default=1000, type=int,
+                        help='Number of events to generate per sensor. Negative for infinite number.')
+    parser.add_argument("-d", "--delay", default=0.5, type=float,
+                        help='Delay between events in second. Can be float.')
+    args = parser.parse_args()
 
+    # Load HopsWorks Kafka configuration
+    conf = toml.load(args.config)
+
+    # Kafka schema that this program supports/expects
+    # The schema will be checked against the schema of the Kafka topic
     schema_str = """
     {
       "type": "record",
@@ -123,20 +140,21 @@ def main():
     registry_url = 'https://' + conf['hops']['url']\
         + conf['api']['base'] + '/project/'+conf['project']['id']+'/kafka'
 
+    # Initialise the Confluent schema registry client
     schema_registry_conf = {'url': registry_url, 'ssl.ca.location': conf['hops']['verify']}
     schema_registry_client = SchemaRegistryClient(schema_registry_conf)
 
-    # add the API key required by HopsWorks but not configurable through the confluent schema registry client
+    # Add the API key required by HopsWorks but not configurable through the confluent schema registry client
     headers={'Authorization': 'ApiKey ' + conf['api']['key']}
     schema_registry_client._rest_client.session.headers.update(headers)
 
-
+    # Initialize the avro serializer
     avro_serializer = AvroSerializer(schema_registry_client,
                                      schema_str,
                                      event_to_dict,
                                      {'auto.register.schemas': False, 'subject.name.strategy': record_subject_name_strategy})
 
-
+    # Initialize the producer
     producer_conf = {'bootstrap.servers': conf['hops']['url']+':'+conf['kafka']['port'],
                      'security.protocol': 'SSL',
                      'ssl.ca.location': conf['project']['ca_file'],
@@ -145,28 +163,25 @@ def main():
                      'ssl.key.password': conf['project']['key_password'],
                      'key.serializer': StringSerializer('utf_8'),
                      'value.serializer': avro_serializer}
-
     producer = SerializingProducer(producer_conf)
 
 
-    # initialize a number of sensors
-    #start/end time step for the sensor data generator
-    start = 0
-    number_of_events = 1000
-    end = start + number_of_events
+    # Initialize a number of sensors
+    start = args.time
+    end = start + args.events if args.events > 0 else -1
     sensors = [
         sensor(baseline=10, slope=0.1,  period = 100, amplitude= 40, noise_level=5, start=start, end=end),
-        sensor(baseline=10, slope=0.2,  period =  80, amplitude= 30, noise_level=4, start=start, end=end),
+        sensor(baseline=10, slope=0.2,  period =  50, amplitude= 30, noise_level=4, start=start, end=end),
         sensor(baseline=20, slope=-0.1, period = 100, amplitude= 50, noise_level=6, phase=20, start=start, end=end),
         sensor(baseline=10, slope=0.1,  period = 100, amplitude= 40, noise_level=0, start=start, end=end),
         ]
 
+    # Start producing events
     print("Producing sensor events to topic {}. ^C to exit.".format(conf['kafka']['topic']))
     print('Press Ctrl-c to stop')
 
     # a counter for the number of time steps generated
     time_step = start
-
     try:
         for data in zip(*sensors):
             timestamp=datetime.now()
@@ -185,13 +200,14 @@ def main():
                 except ValueError:
                     print("Invalid input, discarding record...")
                     continue
-            sleep(0.5)
+            sleep(args.delay)
     except KeyboardInterrupt:
         print('\nStopping...')
-        print('To continue execution start from event {}'.format(time_step))
+
 
     print("Flushing records...")
     producer.flush()
+    print('To continue execution start from event {}'.format(time_step))
 
 
 if __name__ == '__main__':
