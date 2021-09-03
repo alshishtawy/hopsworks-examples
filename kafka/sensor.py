@@ -49,16 +49,19 @@ if __name__ == '__main__':
     # a list of buffers to emulate receving data
     data_buffer =  [deque() for x in range(len(sensors))]
 
-    # plot the data
-    plt.ion()
-    plt.show()
     fig, ax = plt.subplots(len(sensors), sharex=True)
+    lines = [a.plot([])[0] for a in ax]
+    plt.show(block=False)
+
     for events in zip(*sensors):
-        for e, b, a in zip(events, data_buffer, ax):
+        for e, b, l, a in zip(events, data_buffer, lines, ax):
             b.append(e)
-            a.clear()
-            a.plot(b)
-        plt.pause(0.01)
+            l.set_data(range(len(b)), b)
+            a.set_xlim(0, len(b)+10)
+            a.set_ylim(min(b)-10,max(b)+10)
+        fig.canvas.draw()
+        fig.canvas.flush_events()
+
 
 
     # pause execution so you can examin the figure
