@@ -28,6 +28,7 @@ from confluent_kafka.schema_registry import record_subject_name_strategy
 from datetime import datetime
 import toml
 import argparse
+import matplotlib.pyplot as plt
 
 class Event(object):
     """
@@ -129,6 +130,16 @@ def main():
 
     consumer = DeserializingConsumer(consumer_conf)
     consumer.subscribe([conf['kafka']['topic']])
+
+    # a list of buffers to store data for plotting
+    MAX_BUFFER = 1000 # max events to store for plotting, then slide
+    data_buffer =  [deque(MAX_BUFFER) for x in range(4)]
+
+    # Plotting
+    fig, ax = plt.subplots(len(sensors), sharex=True)
+    lines = [a.plot([])[0] for a in ax]
+    plt.show(block=False)
+
 
     while True:
         try:
