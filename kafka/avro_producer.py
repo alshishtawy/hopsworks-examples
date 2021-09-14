@@ -102,7 +102,7 @@ def main():
                         help='Configuration file in toml format.')
     parser.add_argument("-t", "--time", default=0, type=int,
                         help='Start time step for the time series generator. Used to resume '
-                        'generating the same series after stopping the program.')
+                        'generating the time series after stopping the program.')
     parser.add_argument("-e", "--events", default=1000, type=int,
                         help='Number of events to generate per sensor. Negative for infinite number.')
     parser.add_argument("-d", "--delay", default=0.5, type=float,
@@ -169,15 +169,19 @@ def main():
     start = args.time
     end = start + args.events if args.events > 0 else -1
     sensors = [
-        sensor(baseline=10, slope=0.1,  period = 100, amplitude= 40, noise_level=5, start=start, end=end),
-        sensor(baseline=10, slope=0.2,  period =  50, amplitude= 30, noise_level=4, start=start, end=end),
-        sensor(baseline=20, slope=-0.1, period = 100, amplitude= 50, noise_level=6, phase=20, start=start, end=end),
-        sensor(baseline=10, slope=0.1,  period = 100, amplitude= 40, noise_level=0, start=start, end=end),
+        sensor(baseline=10,  slope=0.1,   period = 100, amplitude= 40, noise_level=5, start=start, end=end),
+        sensor(baseline=10,  slope=0.2,   period =  50, amplitude= 30, noise_level=4, start=start, end=end),
+        sensor(baseline=20,  slope=-0.1,  period = 100, amplitude= 50, noise_level=6, phase=20, start=start, end=end),
+        sensor(baseline=10,  slope=0.1,   period = 100, amplitude= 40, noise_level=0, start=start, end=end),
+        sensor(baseline=30,  slope=-0.1,  period = 100, amplitude= 40, noise_level=5, start=start, end=end),
+        sensor(baseline=40,  slope=0,     period = 200, amplitude= 10, noise_level=4, start=start, end=end),
+        sensor(baseline=0,   slope=0.3,   period = 100, amplitude= 20, noise_level=6, phase=50, start=start, end=end),
+        sensor(baseline=-10, slope=0.1,   period = 100, amplitude= 40, noise_level=9, start=start, end=end),
         ]
 
     # Start producing events
-    print("Producing sensor events to topic {}. ^C to exit.".format(conf['kafka']['topic']))
-    print('Press Ctrl-c to stop')
+    print("Producing sensor events to topic {}.".format(conf['kafka']['topic']))
+    print('Press Ctrl-c to exit.')
 
     # a counter for the number of time steps generated
     time_step = start
