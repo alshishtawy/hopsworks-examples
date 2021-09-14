@@ -1,29 +1,31 @@
+# HopsWorks Kafka configuration
+
 [hops]
 url = '127.0.0.1'
-# set to False or path to server certificate file
-# when using Hopsworks with a self signed certificate
-# otherwise leave this True
+
+# for testing only! set this flag to false or path to server certificate file
+# needed when testing Hopsworks with a self signed certificate
+# otherwise leave this true
 verify = false
 
 [project]
-name =  'MyProject'
-# use hdfs.project_id() on Hopsworks to get your project ID
-id = '120'
-ca_file = 'trustStore.pem'
-certificate_file = 'keyStore.pem'
-key_file = 'keyStore.pem'
-key_password = 'password'
+name =  'Kafka_Tutorial'
+id = '1143'
+ca_file = 'cert/trustStore.pem'
+certificate_file = 'cert/keyStore.pem'
+key_file = 'cert/keyStore.pem'
+key_password = 'asdf123'
 
 [kafka]
-topic = 'topic_name'
-schema = 'schema_name'
+topic = 'temperature'
+schema = 'sensor'
 port = '9092'
 
 [kafka.consumer]
-group_id = 'MyGroup'
+group_id = 'TutorialGroup'
 auto_offset_reset =  'earliest'
 
 [api]
 base = '/hopsworks-api/api'
-key = 'paste your api key here'
-key_file = 'api_key_file'
+key = 'K97n09yskcBuuFyO.scfQegUMhXfHg7v3Tpk8t6HIPUlmIP463BPdbTSdSEKAfo5AB8SIwY8LGgB4924B'
+key_file = 'cert/apiKeyFile'
