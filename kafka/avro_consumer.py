@@ -25,9 +25,10 @@ from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroDeserializer
 from confluent_kafka.serialization import StringDeserializer
 from confluent_kafka.schema_registry import record_subject_name_strategy
-from datetime import datetime
+from datetime import datetime, timedelta
 import toml
 import argparse
+from collections import deque
 import matplotlib.pyplot as plt
 
 class Event(object):
@@ -50,7 +51,7 @@ class Event(object):
 
 def dict_to_event(obj, ctx):
     """
-    Converts object literal(dict) to a User instance.
+    Converts object literal(dict) to an Event instance.
 
     Args:
         obj (dict): Object literal(dict)
@@ -133,14 +134,27 @@ def main():
 
     # a list of buffers to store data for plotting
     MAX_BUFFER = 1000 # max events to store for plotting, then slide
-    data_buffer =  [deque(MAX_BUFFER) for x in range(4)]
+    buffer =  [deque(maxlen=MAX_BUFFER) for x in range(8)]
 
     # Plotting
-    fig, ax = plt.subplots(len(sensors), sharex=True)
+    fig, ax = plt.subplots(len(buffer), sharex=True)
     lines = [a.plot([])[0] for a in ax]
     plt.show(block=False)
 
+    def plot():
+        # x is shared
+        ax[0].set_xlim(0, max(len(b) for b in buffer)+10)
 
+        for b, l, a in zip(buffer, lines, ax):
+            if len(b)==0:
+                continue
+            l.set_data(range(len(b)), b)
+            a.set_ylim(min(b)-10,max(b)+10)
+        fig.canvas.draw()
+        fig.canvas.flush_events()
+
+    time = datetime.now()
+    delta = timedelta(seconds=0.5)
     while True:
         try:
             # SIGINT can't be handled when polling, limit timeout to 1 second.
@@ -156,6 +170,14 @@ def main():
                       .format(msg.key(), event.id,
                               event.timestamp,
                               event.value))
+                # store event in buffer for plotting
+                id = int(event.id[6:])
+                buffer[id].append(event.value)
+
+            # plot
+            if datetime.now() - time > delta:
+                time = datetime.now()
+                plot()
         except KeyboardInterrupt:
             break
 

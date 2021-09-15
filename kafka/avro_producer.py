@@ -31,6 +31,7 @@ import argparse
 from sensor import sensor
 from time import sleep
 
+
 class Event(object):
     """
     An object representing a sensor event
@@ -169,14 +170,14 @@ def main():
     start = args.time
     end = start + args.events if args.events > 0 else -1
     sensors = [
-        sensor(baseline=10,  slope=0.1,   period = 100, amplitude= 40, noise_level=5, start=start, end=end),
-        sensor(baseline=10,  slope=0.2,   period =  50, amplitude= 30, noise_level=4, start=start, end=end),
-        sensor(baseline=20,  slope=-0.1,  period = 100, amplitude= 50, noise_level=6, phase=20, start=start, end=end),
-        sensor(baseline=10,  slope=0.1,   period = 100, amplitude= 40, noise_level=0, start=start, end=end),
-        sensor(baseline=30,  slope=-0.1,  period = 100, amplitude= 40, noise_level=5, start=start, end=end),
-        sensor(baseline=40,  slope=0,     period = 200, amplitude= 10, noise_level=4, start=start, end=end),
-        sensor(baseline=0,   slope=0.3,   period = 100, amplitude= 20, noise_level=6, phase=50, start=start, end=end),
-        sensor(baseline=-10, slope=0.1,   period = 100, amplitude= 40, noise_level=9, start=start, end=end),
+        sensor(baseline=10,  slope=0.1,   period=100, amplitude=40, noise_level=5, start=start, end=end),
+        sensor(baseline=10,  slope=0.2,   period=50,  amplitude=30, noise_level=4, start=start, end=end),
+        sensor(baseline=20,  slope=-0.1,  period=100, amplitude=50, noise_level=6, phase=20, start=start, end=end),
+        sensor(baseline=10,  slope=0.1,   period=100, amplitude=40, noise_level=0, start=start, end=end),
+        sensor(baseline=30,  slope=-0.1,  period=100, amplitude=40, noise_level=5, start=start, end=end),
+        sensor(baseline=40,  slope=0,     period=200, amplitude=10, noise_level=4, start=start, end=end),
+        sensor(baseline=0,   slope=0.3,   period=100, amplitude=20, noise_level=6, phase=50, start=start, end=end),
+        sensor(baseline=-10, slope=0.1,   period=100, amplitude=40, noise_level=9, start=start, end=end),
         ]
 
     # Start producing events
@@ -187,7 +188,7 @@ def main():
     time_step = start
     try:
         for data in zip(*sensors):
-            timestamp=datetime.now()
+            timestamp = datetime.now()
             time_step += 1
             for i, d in enumerate(data):
                 # Serve on_delivery callbacks from previous calls to produce()
