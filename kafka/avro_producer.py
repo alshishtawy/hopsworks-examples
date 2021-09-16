@@ -149,11 +149,14 @@ def main():
     headers={'Authorization': 'ApiKey ' + conf['api']['key']}
     schema_registry_client._rest_client.session.headers.update(headers)
 
-    # Initialize the avro serializer
+    # Initialize the avro serializer for the value using the schema
     avro_serializer = AvroSerializer(schema_registry_client,
                                      schema_str,
                                      event_to_dict,
                                      {'auto.register.schemas': False, 'subject.name.strategy': record_subject_name_strategy})
+
+    # Initialize a simple String serializer for the key
+    string_serializer = StringSerializer('utf_8')
 
     # Initialize the producer
     producer_conf = {'bootstrap.servers': conf['hops']['url']+':'+conf['kafka']['port'],
@@ -162,7 +165,7 @@ def main():
                      'ssl.certificate.location': conf['project']['certificate_file'],
                      'ssl.key.location': conf['project']['key_file'],
                      'ssl.key.password': conf['project']['key_password'],
-                     'key.serializer': StringSerializer('utf_8'),
+                     'key.serializer': string_serializer,
                      'value.serializer': avro_serializer}
     producer = SerializingProducer(producer_conf)
 
@@ -183,9 +186,7 @@ def main():
     # Start producing events
     print("Producing sensor events to topic {}.".format(conf['kafka']['topic']))
     print('Press Ctrl-c to exit.')
-
-    # a counter for the number of time steps generated
-    time_step = start
+    time_step = start     # a counter for the number of time steps generated
     try:
         for data in zip(*sensors):
             timestamp = datetime.now()

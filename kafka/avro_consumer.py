@@ -73,10 +73,15 @@ def main():
     parser = argparse.ArgumentParser(description='Consumes events from kafka topic hosted at a HopsWorks cluster.')
     parser.add_argument("-c", "--config", default='config.toml',
                         help='Configuration file in toml format.')
+    parser.add_argument("-s", "--sensors", default=8, type=int,
+                        help='The total number of sensors to visualize.')
     args = parser.parse_args()
 
+    # Load HopsWorks Kafka configuration
     conf = toml.load(args.config)
 
+    # Kafka schema that this program supports/expects
+    # The schema will be checked against the schema of the Kafka topic
     schema_str = """
     {
       "type": "record",
@@ -98,24 +103,28 @@ def main():
       ]
     }
     """
+
+    # url for the schema registry in HopsWorks REST API services
     registry_url = 'https://' + conf['hops']['url']\
         + conf['api']['base'] + '/project/'+conf['project']['id']+'/kafka'
 
+    # Initialise the Confluent schema registry client
     schema_registry_conf = {'url': registry_url, 'ssl.ca.location': conf['hops']['verify']}
     schema_registry_client = SchemaRegistryClient(schema_registry_conf)
 
     # Add the API key required by HopsWorks but not configurable through the confluent schema registry client
-
     headers={'Authorization': 'ApiKey ' + conf['api']['key']}
-
     schema_registry_client._rest_client.session.headers.update(headers)
 
+    # Initialize the avro deserializer for the value using the schema
     avro_deserializer = AvroDeserializer(schema_registry_client,
                                          schema_str,
                                          dict_to_event)
 
+    # Initialize a simple String deserializer for the key
     string_deserializer = StringDeserializer('utf_8')
 
+    # Initialize the consumer
     consumer_conf = {'bootstrap.servers': conf['hops']['url']+':'+conf['kafka']['port'],
                      'security.protocol': 'SSL',
                      'ssl.ca.location': conf['project']['ca_file'],
@@ -127,14 +136,13 @@ def main():
                      'group.id': conf['kafka']['consumer']['group_id'],
                      'auto.offset.reset': conf['kafka']['consumer']['auto_offset_reset'],
                      }
-
-
     consumer = DeserializingConsumer(consumer_conf)
+    # Subscribe to a topic
     consumer.subscribe([conf['kafka']['topic']])
 
     # a list of buffers to store data for plotting
-    MAX_BUFFER = 1000 # max events to store for plotting, then slide
-    buffer =  [deque(maxlen=MAX_BUFFER) for x in range(8)]
+    MAX_BUFFER = 1000 # max events to store for plotting, then graph will scroll
+    buffer = [deque(maxlen=MAX_BUFFER) for x in range(args.sensors)]
 
     # Plotting
     fig, ax = plt.subplots(len(buffer), sharex=True)
@@ -142,21 +150,27 @@ def main():
     plt.show(block=False)
 
     def plot():
-        # x is shared
+        # x is shared, so set lim once
         ax[0].set_xlim(0, max(len(b) for b in buffer)+10)
 
         for b, l, a in zip(buffer, lines, ax):
-            if len(b)==0:
+            if len(b) == 0:
                 continue
             l.set_data(range(len(b)), b)
-            a.set_ylim(min(b)-10,max(b)+10)
+            a.set_ylim(min(b)-10, max(b)+10)
         fig.canvas.draw()
         fig.canvas.flush_events()
 
-    time = datetime.now()
+    # loop for consuming events
+    time = datetime.now()         # time for replotting every delta seconds
     delta = timedelta(seconds=0.5)
     while True:
         try:
+            # plot
+            if datetime.now() - time > delta:
+                time = datetime.now()
+                plot()
+
             # SIGINT can't be handled when polling, limit timeout to 1 second.
             msg = consumer.poll(1.0)
             if msg is None:
@@ -174,10 +188,6 @@ def main():
                 id = int(event.id[6:])
                 buffer[id].append(event.value)
 
-            # plot
-            if datetime.now() - time > delta:
-                time = datetime.now()
-                plot()
         except KeyboardInterrupt:
             break
 
