@@ -24,12 +24,12 @@ from confluent_kafka import DeserializingConsumer
 from confluent_kafka.schema_registry import SchemaRegistryClient
 from confluent_kafka.schema_registry.avro import AvroDeserializer
 from confluent_kafka.serialization import StringDeserializer
-from confluent_kafka.schema_registry import record_subject_name_strategy
 from datetime import datetime, timedelta
 import toml
 import argparse
 from collections import deque
 import matplotlib.pyplot as plt
+
 
 class Event(object):
     """
@@ -38,7 +38,7 @@ class Event(object):
     Args:
         id (str): Sensor's id
 
-        timestamp (datetime): timestamp in milliseconds
+        timestamp (datetime): timestamp when the event happened
 
         value (double): Sensor's reading value
 
@@ -64,8 +64,8 @@ def dict_to_event(obj, ctx):
         return None
 
     return Event(id=obj['id'],
-                timestamp=datetime.fromtimestamp(obj['timestamp']),
-                value=obj['value'])
+                 timestamp=obj['timestamp'],
+                 value=obj['value'])
 
 
 def main():
@@ -89,8 +89,10 @@ def main():
       "fields": [
         {
           "name": "timestamp",
-          "type": "long",
-          "logicalType": "timestamp-millis"
+          "type": {
+            "type": "long",
+            "logicalType": "timestamp-millis"
+          }
         },
         {
           "name": "id",
@@ -113,7 +115,7 @@ def main():
     schema_registry_client = SchemaRegistryClient(schema_registry_conf)
 
     # Add the API key required by HopsWorks but not configurable through the confluent schema registry client
-    headers={'Authorization': 'ApiKey ' + conf['api']['key']}
+    headers = {'Authorization': 'ApiKey ' + conf['api']['key']}
     schema_registry_client._rest_client.session.headers.update(headers)
 
     # Initialize the avro deserializer for the value using the schema
@@ -141,7 +143,7 @@ def main():
     consumer.subscribe([conf['kafka']['topic']])
 
     # a list of buffers to store data for plotting
-    MAX_BUFFER = 1000 # max events to store for plotting, then graph will scroll
+    MAX_BUFFER = 1000  # max events to store for plotting, then graph will scroll
     buffer = [deque(maxlen=MAX_BUFFER) for x in range(args.sensors)]
 
     # Plotting

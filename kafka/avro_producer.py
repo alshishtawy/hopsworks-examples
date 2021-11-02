@@ -39,7 +39,7 @@ class Event(object):
     Args:
         id (str): Sensor's id
 
-        timestamp (datetime): timestamp in milliseconds
+        timestamp (datetime): timestamp when the event happened
 
         value (double): Sensor's reading value
 
@@ -65,7 +65,7 @@ def event_to_dict(event, ctx):
 
     """
     return dict(id=event.id,
-                timestamp=datetime.timestamp(event.timestamp),
+                timestamp=event.timestamp,
                 value=event.value)
 
 
@@ -122,8 +122,10 @@ def main():
       "fields": [
         {
           "name": "timestamp",
-          "type": "long",
-          "logicalType": "timestamp-millis"
+          "type": {
+            "type": "long",
+            "logicalType": "timestamp-millis"
+          }
         },
         {
           "name": "id",
@@ -146,7 +148,7 @@ def main():
     schema_registry_client = SchemaRegistryClient(schema_registry_conf)
 
     # Add the API key required by HopsWorks but not configurable through the confluent schema registry client
-    headers={'Authorization': 'ApiKey ' + conf['api']['key']}
+    headers = {'Authorization': 'ApiKey ' + conf['api']['key']}
     schema_registry_client._rest_client.session.headers.update(headers)
 
     # Initialize the avro serializer for the value using the schema
